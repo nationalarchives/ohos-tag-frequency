@@ -3,49 +3,101 @@ import lodashDebounce from 'https://cdn.jsdelivr.net/npm/lodash.debounce@4.0.8/+
 
 import { termsRange } from './process-sample-data.js';
 
-function setCircleRadius(data, width, height, padding) {
+/**
+ * setCircleRadius
+ *
+ * @param {Array} data
+ * @param {Number} width
+ * @param {Number} height
+ * @returns {Array}
+ */
+function setCircleRadius(data, width, height) {
 
-  const scaleValue = 0.4;
+  /**
+   * Amount to scale the area of the canvas by
+   */
+  const scaleAreaValue = 0.4;
 
-  console.log({
-    width,
-    height,
-    widthScaled: width * scaleValue,
-    heightScaled: height * scaleValue,
-  })
+  /**
+   * Area of the canvas, scaled down to allow for spacing around the circles
+   */
+  const scaledCanvasArea = width * height * scaleAreaValue;
 
-  const canvasArea = (width - (width * scaleValue)) * (height - (height * scaleValue));
-  // const canvasArea = (width - (padding * 2)) * (height - (padding * 2));
-
+  /**
+   * Map data to an array of count values
+   *
+   * @returns {Array}
+   */
   const countValues = data.map(d => d.count);
 
+  /**
+   * Get smallest count value, to make it possible to create a range between the smallest and largest values
+   */
   const smallestValue = Math.min(...countValues);
+
+  /**
+   * Get largest count value, to make it possible to create a range between the smallest and largest values
+   */
   const largestValue = Math.max(...countValues);
 
-  const scaleDataToRadius = d3.scaleSqrt()
+  /**
+   * Normalise the range of the count values
+   * @returns {Function}
+   */
+  const normaliseRange = d3.scaleSqrt()
     .domain([smallestValue, largestValue])
     .range([50, 85]);
 
-  const dataMappedToRadius = data.map(d => scaleDataToRadius(d.count));
+  /**
+   * Convert the countValues to scaled radius values
+   * @returns {Array}
+   */
+  const dataMappedToRadius = countValues.map(d => normaliseRange(d));
 
-  const countValuesSquared = dataMappedToRadius.map(value => Math.pow(value, 2));
+  /**
+   * Square the radius values to get their area
+   * @returns {Array}
+   */
+  const circleAreas = dataMappedToRadius.map(value => Math.pow(value, 2));
 
-  const sumOfSquaredValues = countValuesSquared.reduce((acc, val) => acc + val, 0);
+  /**
+   * Add each value together to get the total area
+   * @returns {Number}
+   */
+  const sumOfSquaredValues = circleAreas.reduce((acc, val) => acc + val, 0);
 
-  const scalingFactor = canvasArea / sumOfSquaredValues;
+  /**
+   * Calculate the scaling factor to apply to the area of each circle
+   */
+  const scalingFactor = scaledCanvasArea / sumOfSquaredValues;
 
-  const scaledSquareAreas = countValuesSquared.map(value => value * scalingFactor);
+  /**
+   * Scale the area of each circle to fit the canvas
+   * @returns {Array}
+   */
+  const scaledSquareAreas = circleAreas.map(value => value * scalingFactor);
 
-  const scaledSquareDimensions = scaledSquareAreas.map(value => Math.sqrt(value));
+  /**
+   * Get the square root of the scaled area values to get the dimensions of the circles
+   */
+  const scaledCircleRadius = scaledSquareAreas.map(value => Math.sqrt(value) / 2);
 
-  const getCircleRadius = (d, i) => scaledSquareDimensions[i] / 2;
+  /**
+   * Function to get the radius of the circle from the `scaledCircleRadius` array
+   * @param {Array} d Data
+   * @param {Number} i Index
+   * @returns
+   */
+  const getCircleRadius = (i) => scaledCircleRadius[i];
 
-  const mapCircleRadius = d3.map(data, getCircleRadius);
-
+  /**
+   * Map the data to include the radius value
+   * @returns {Array}
+   */
   const dataWithRadius = data.map((d, i) => {
     return {
       ...d,
-      radius: mapCircleRadius[i],
+      radius: getCircleRadius(i),
     }
   });
 
@@ -55,9 +107,7 @@ function setCircleRadius(data, width, height, padding) {
 function chartForceSimulation(data, options = {}) {
 
   const {
-    width = 640, // outer width, in pixels
     height = 480, // outer height, in pixels
-    padding = 150, // padding around chart area
     disableAnimation = true,
     container = null,
   } = options;
@@ -71,10 +121,8 @@ function chartForceSimulation(data, options = {}) {
   };
 
   const svg = d3.create("svg")
-    // .attr("viewBox", `0 0 ${width} ${height}`)
     .attr("width", '100%')
     .attr("height", height)
-    .attr("style", `max-width: ${width}px;`)
     .attr("font-size", 14)
     .attr("font-family", "sans-serif")
     .attr("text-anchor", "middle");
@@ -82,7 +130,7 @@ function chartForceSimulation(data, options = {}) {
 
   const containerWidth = container.getBoundingClientRect().width;
 
-  const dataWithRadius = setCircleRadius(data, containerWidth, height, padding);
+  const dataWithRadius = setCircleRadius(data, containerWidth, height);
 
   const urlParams = new URLSearchParams(window.location.search);
 
@@ -130,55 +178,40 @@ function chartForceSimulation(data, options = {}) {
     .text(d => d)
     .join('tspan');
 
-  const simulation = d3.forceSimulation(dataWithRadius)
-    .force('center', d3.forceCenter(containerWidth / 2, height / 2))
-    .force('charge', d3.forceManyBody().strength(5))
-    .force('collision', d3.forceCollide().radius(d => d.radius + 5))
+  const simulation = d3.forceSimulation(dataWithRadius);
 
-    if(containerWidth > height) {
-      simulation.force('y', d3.forceY(height / 2).strength(0.03));
-    } else {
-      simulation.force('y', null);
-    }
-
-
-  if(disableAnimation === true) {
-    simulation.stop().tick(300);
-    node.attr('transform', d => `translate(${d.x}, ${d.y})`);
-  } else {
-    simulation.nodes(dataWithRadius)
-      .on('tick', () => node.attr('transform', d => `translate(${d.x}, ${d.y})`));
-  }
-
-  function runSimulation(data) {
+  function triggerForceSimulation(data, width, height) {
     simulation
-      .nodes(data)
-      .force('center', d3.forceCenter(containerWidth / 2, height / 2))
+      .force('center', d3.forceCenter(width / 2, height / 2))
       .force('charge', d3.forceManyBody().strength(5))
       .force('collision', d3.forceCollide().radius(d => d.radius + 5))
 
-    if(containerWidth > height) {
-      simulation.force('y', d3.forceY(height / 2).strength(0.03));
+      if(width > height) {
+        simulation.force('y', d3.forceY(height / 2).strength(0.03));
+      } else {
+        simulation.force('y', null);
+      }
+
+
+    if(disableAnimation === true) {
+      simulation.stop().tick(300);
+      node.attr('transform', d => `translate(${d.x}, ${d.y})`);
     } else {
-      simulation.force('y', null);
+      simulation.nodes(data)
+        .on('tick', () => node.attr('transform', d => `translate(${d.x}, ${d.y})`));
     }
 
+    return simulation;
+  }
 
-  if(disableAnimation === true) {
-    simulation.stop().tick(300);
-    node.attr('transform', d => `translate(${d.x}, ${d.y})`);
-  } else {
-    simulation.nodes(dataWithRadius)
-      .on('tick', () => node.attr('transform', d => `translate(${d.x}, ${d.y})`));
-  }
-  }
+  triggerForceSimulation(dataWithRadius, containerWidth, height);
 
   function updateSize() {
     const newWidth = svg.node().getBoundingClientRect().width;
 
     if (newWidth === containerWidth) return;
 
-    const newDataWithRadius = setCircleRadius(data, newWidth, height, padding);
+    const newDataWithRadius = setCircleRadius(data, newWidth, height);
 
     node.data(newDataWithRadius)
       .select('circle')
@@ -186,20 +219,13 @@ function chartForceSimulation(data, options = {}) {
 
     simulation
       .nodes(newDataWithRadius)
-      .force('center', d3.forceCenter(newWidth / 2, height / 2))
-      .force('charge', d3.forceManyBody().strength(5))
-      .force('collision', d3.forceCollide().radius(d => d.radius + 5));
 
-      if(newWidth > height) {
-        simulation.force('y', d3.forceY(height / 2).strength(0.03));
-      } else {
-        simulation.force('y', null);
-      }
+    triggerForceSimulation(newDataWithRadius, newWidth, height);
 
     simulation.alpha(1).restart();
   }
 
-  const containerResizeObserver = new ResizeObserver(lodashDebounce(updateSize, 500));
+  const containerResizeObserver = new ResizeObserver(lodashDebounce(updateSize, 250));
 
   containerResizeObserver.observe(container);
 
@@ -215,7 +241,6 @@ const disableAnimation = window.location.search.includes('disableAnimation=true'
 const containerForceSimulation = document.getElementById('chart-force-simulation');
 
 const chartCustom = chartForceSimulation(termsRange, {
-  width: 1168,
   height: 550,
   disableAnimation,
   container: containerForceSimulation,
