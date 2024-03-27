@@ -3,6 +3,45 @@ import lodashDebounce from 'https://cdn.jsdelivr.net/npm/lodash.debounce@4.0.8/+
 
 import { termsRange } from './process-sample-data.js';
 
+const urlParams = new URLSearchParams(window.location.search);
+
+/**
+ * Colours are mapped to `ne_type` in the data
+ */
+const colorsMap = {
+  LOC: "#EDAE49",
+  PER: "#84A59D",
+  ORG: "#B5E2FA",
+  MISC: "#F28482",
+  DATE: "#FAF0CA",
+};
+
+/**
+ * @param {String} term
+ * @param {String} type
+ * @returns {Boolean}
+ */
+const isSelectedItem = (term, type) => {
+  const termParam = urlParams.get('term');
+  const typeParam = urlParams.get('type');
+
+  return term === termParam && type === typeParam;
+}
+
+/**
+ * Create href for each circle
+ * @param {String} term
+ * @param {String} type
+ * @returns {String}
+ */
+const createHref = (term, type) => {
+  if (urlParams.get('disableAnimation') === 'true') {
+    return `?term=${term}&type=${type}&disableAnimation=true`;
+  }
+
+  return `?term=${term}&type=${type}`;
+}
+
 /**
  * setCircleRadius
  *
@@ -11,7 +50,7 @@ import { termsRange } from './process-sample-data.js';
  * @param {Number} height
  * @returns {Array}
  */
-function setCircleRadius(data, width, height) {
+const setCircleRadius = (data, width, height) => {
 
   /**
    * Amount to scale the area of the canvas by
@@ -104,50 +143,31 @@ function setCircleRadius(data, width, height) {
   return dataWithRadius
 }
 
-function chartForceSimulation(data, options = {}) {
-
+/**
+ * Create a d3 force simulation chart
+ * @param {Array} data
+ * @param {Object} options
+ * @returns {HTMLElement}
+ */
+const chartForceSimulation = (data, options = {}) => {
   const {
-    height = 480, // outer height, in pixels
+    height = 550,
     disableAnimation = true,
     container = null,
   } = options;
 
-  const colorsMap = {
-    LOC: "#EDAE49",
-    PER: "#84A59D",
-    ORG: "#B5E2FA",
-    MISC: "#F28482",
-    DATE: "#FAF0CA",
-  };
+  let containerWidth = container.getBoundingClientRect().width;
+  const dataWithRadius = setCircleRadius(data, containerWidth, height);
 
+  /**
+   * Create d3 instance of SVG element
+   */
   const svg = d3.create("svg")
     .attr("width", '100%')
     .attr("height", height)
     .attr("font-size", 14)
     .attr("font-family", "sans-serif")
     .attr("text-anchor", "middle");
-
-
-  const containerWidth = container.getBoundingClientRect().width;
-
-  const dataWithRadius = setCircleRadius(data, containerWidth, height);
-
-  const urlParams = new URLSearchParams(window.location.search);
-
-  const isSelectedItem = (term, type) => {
-    const termParam = urlParams.get('term');
-    const typeParam = urlParams.get('type');
-
-    return term === termParam && type === typeParam;
-  }
-
-  const createHref = (term, type) => {
-    if (urlParams.get('disableAnimation') === 'true') {
-      return `?term=${term}&type=${type}&disableAnimation=true`;
-    }
-
-    return `?term=${term}&type=${type}`;
-  }
 
   // Create a group for each circle and text element
   const node = svg.selectAll('a')
@@ -156,14 +176,14 @@ function chartForceSimulation(data, options = {}) {
     .attr('xlink:href', d => createHref(d.term, d.type));
 
   // Append circle to each group
-  const circle = node.append('circle')
+  node.append('circle')
     .attr('r', d => d.radius)
     .attr('fill', d => colorsMap[d.type])
     .attr("stroke", d => isSelectedItem(d.term, d.type) ? '#1E1E1E' : '#8A8A8A')
     .attr("stroke-width", d => isSelectedItem(d.term, d.type) ? 5 : 1);
 
   // Append text to each group
-  const text = node.append('text')
+  node.append('text')
     .selectAll('tspan')
     .data(d => {
       const terms = d.term.split(/(?=[A-Z][a-z])/g);
@@ -178,9 +198,14 @@ function chartForceSimulation(data, options = {}) {
     .text(d => d)
     .join('tspan');
 
-  const simulation = d3.forceSimulation(dataWithRadius);
-
-  function triggerForceSimulation(data, width, height) {
+  /**
+   * Run the force simulation, responsible for positioning the circles within the SVG element
+   * Gets called on initial page load, and when the SVG is resized
+   * @param {Array} data
+   * @param {Number} width
+   * @param {Number} height
+   */
+  const runForceSimulation = (data, width, height) => {
     simulation
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('charge', d3.forceManyBody().strength(5))
@@ -192,7 +217,6 @@ function chartForceSimulation(data, options = {}) {
         simulation.force('y', null);
       }
 
-
     if(disableAnimation === true) {
       simulation.stop().tick(300);
       node.attr('transform', d => `translate(${d.x}, ${d.y})`);
@@ -200,16 +224,22 @@ function chartForceSimulation(data, options = {}) {
       simulation.nodes(data)
         .on('tick', () => node.attr('transform', d => `translate(${d.x}, ${d.y})`));
     }
-
-    return simulation;
   }
 
-  triggerForceSimulation(dataWithRadius, containerWidth, height);
+  /**
+   * Create a d3 force simulation instance with initial radius data
+   * {@link https://d3js.org/d3-force/simulation}
+   */
+  const simulation = d3.forceSimulation(dataWithRadius);
 
-  function updateSize() {
-    const newWidth = svg.node().getBoundingClientRect().width;
+  runForceSimulation(dataWithRadius, containerWidth, height);
+
+  const updateSize = () => {
+    const newWidth = container.getBoundingClientRect().width;
 
     if (newWidth === containerWidth) return;
+
+    containerWidth = newWidth;
 
     const newDataWithRadius = setCircleRadius(data, newWidth, height);
 
@@ -217,21 +247,23 @@ function chartForceSimulation(data, options = {}) {
       .select('circle')
       .attr('r', d => d.radius);
 
+    /**
+     * Update simulation with new radius data calculated from the new width
+     * and re run simulation
+     */
     simulation
       .nodes(newDataWithRadius)
 
-    triggerForceSimulation(newDataWithRadius, newWidth, height);
+    runForceSimulation(newDataWithRadius, newWidth, height);
 
     simulation.alpha(1).restart();
   }
 
-  const containerResizeObserver = new ResizeObserver(lodashDebounce(updateSize, 250));
-
-  containerResizeObserver.observe(container);
-
-  return svg.node();
+  return {
+    chartElement: svg.node(),
+    updateSize,
+  };
 };
-
 
 /**
  * Initialisation
@@ -241,9 +273,12 @@ const disableAnimation = window.location.search.includes('disableAnimation=true'
 const containerForceSimulation = document.getElementById('chart-force-simulation');
 
 const chartCustom = chartForceSimulation(termsRange, {
-  height: 550,
   disableAnimation,
   container: containerForceSimulation,
 });
 
-containerForceSimulation.appendChild(chartCustom);
+containerForceSimulation.appendChild(chartCustom.chartElement);
+
+const containerResizeObserver = new ResizeObserver(lodashDebounce(chartCustom.updateSize, 250));
+
+containerResizeObserver.observe(containerForceSimulation);
