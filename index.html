@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OHOS Frequency / Tag chart</title>
+
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+
+<div class="container">
+
+    <ul class="search-results__tags-list">
+        <li>
+            <a href="/?dataType=LOC" class="ohos-tag ohos-tag--location">
+                <span class="ohos-tag__inner">Location</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="/?dataType=PER" class="ohos-tag ohos-tag--person">
+                <span class="ohos-tag__inner">Person</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="/?dataType=ORG" class="ohos-tag ohos-tag--organisation">
+                <span class="ohos-tag__inner">Organisation</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="/?dataType=MISC" class="ohos-tag ohos-tag--misc">
+                <span class="ohos-tag__inner">Miscellaneous</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="/?dataType=DATE" class="ohos-tag ohos-tag--other">
+                <span class="ohos-tag__inner">Date</span>
+            </a>
+        </li>
+
+        <li>
+            <a href="/" class="ohos-tag ohos-tag--clear">
+                <span class="ohos-tag__inner">Clear all</span>
+            </a>
+        </li>
+
+    </ul>
+
+    <div id="chart-circle-pack"></div>
+    <div id="chart-force-simulation"></div>
+
+</div>
+
+<script type="module" src="./js/chart-circle-packing.js"></script>
+<script type="module" src="./js/chart-force-simulation.js"></script>
+
+</body>
+</html>
