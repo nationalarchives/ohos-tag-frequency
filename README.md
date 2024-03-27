@@ -1,25 +1,9 @@
 # Introduction
-This repository is a [template repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
 
-When you want to create a new DA repository, you should do so by using this template.  Hint: click the green button above that says "Use this template".
+Frequency view work for OHOS project
 
-# Why
-We want to ensure that all repositories in DA follow defined conventions and standards. See [The Engineering Handbook](https://national-archives.atlassian.net/wiki/spaces/DAAE/pages/47775767/Engineering+Handbook).
-
-Specifically, this mandates that all repositories implement at least these minimal set of [pre-commit](https://pre-commit.com/) hooks and a pre-commit check.  Update these as you see fit - if you need to.
-
-It is therefore required that you use [pre-commit](https://pre-commit.com/) and the [detect secrets](https://github.com/Yelp/detect-secrets) tool/hook.
-
-They can generally be installed with pip. e.g.
-
-```
-pip install pre-commit
-pip install detect-secrets
-```
-
-You will need to initialise pre-commit after cloning the newly created repository by running:
-
-```pre-commit install```
+# Technologies
+...
 
 # Contents
 ```README.md``` - Change this as appropriate.
